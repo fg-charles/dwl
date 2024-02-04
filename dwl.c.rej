@@ -1,0 +1,64 @@
+--- dwl.c
++++ dwl.c
+@@ -683,6 +705,9 @@ cleanupmon(struct wl_listener *listener, void *data)
+ 	LayerSurface *l, *tmp;
+ 	int i;
+ 
++	DwlIpcOutput *ipc_output, *ipc_output_tmp;
++	wl_list_for_each_safe(ipc_output, ipc_output_tmp, &m->dwl_ipc_outputs, link)
++		wl_resource_destroy(ipc_output->resource);
+ 	for (i = 0; i <= ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY; i++)
+ 		wl_list_for_each_safe(l, tmp, &m->layers[i], link)
+ 			wlr_layer_surface_v1_destroy(l->layer_surface);
+@@ -898,6 +924,7 @@ createmon(struct wl_listener *listener, void *data)
+ 	Monitor *m = wlr_output->data = ecalloc(1, sizeof(*m));
+ 	m->wlr_output = wlr_output;
+ 
++	wl_list_init(&m->dwl_ipc_outputs);
+ 	wlr_output_init_render(wlr_output, alloc, drw);
+ 
+ 	/* Initialize monitor state using configured rules */
+@@ -2026,41 +2238,8 @@ void
+ printstatus(void)
+ {
+ 	Monitor *m = NULL;
+-	Client *c;
+-	uint32_t occ, urg, sel;
+-	const char *appid, *title;
+-
+-	wl_list_for_each(m, &mons, link) {
+-		occ = urg = 0;
+-		wl_list_for_each(c, &clients, link) {
+-			if (c->mon != m)
+-				continue;
+-			occ |= c->tags;
+-			if (c->isurgent)
+-				urg |= c->tags;
+-		}
+-		if ((c = focustop(m))) {
+-			title = client_get_title(c);
+-			appid = client_get_appid(c);
+-			printf("%s title %s\n", m->wlr_output->name, title ? title : broken);
+-			printf("%s appid %s\n", m->wlr_output->name, appid ? appid : broken);
+-			printf("%s fullscreen %u\n", m->wlr_output->name, c->isfullscreen);
+-			printf("%s floating %u\n", m->wlr_output->name, c->isfloating);
+-			sel = c->tags;
+-		} else {
+-			printf("%s title \n", m->wlr_output->name);
+-			printf("%s appid \n", m->wlr_output->name);
+-			printf("%s fullscreen \n", m->wlr_output->name);
+-			printf("%s floating \n", m->wlr_output->name);
+-			sel = 0;
+-		}
+-
+-		printf("%s selmon %u\n", m->wlr_output->name, m == selmon);
+-		printf("%s tags %u %u %u %u\n", m->wlr_output->name, occ, m->tagset[m->seltags],
+-				sel, urg);
+-		printf("%s layout %s\n", m->wlr_output->name, m->ltsymbol);
+-	}
+-	fflush(stdout);
++	wl_list_for_each(m, &mons, link)
++		dwl_ipc_output_printstatus(m);
+ }
+ 
+ void
